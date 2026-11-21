@@ -1,14 +1,14 @@
-# PHP & Laravel to Rust: The Modern Rosetta Stone
+# PHP 8.6 & Laravel 13 to Rust: The Modern Rosetta Stone
 
-Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 2021/2024 Edition)**.
+Targeted for **Laravel 13 (PHP 8.6)** and **Modern Rust (Rust 1.85+, 2024 Edition)**.
 
 ---
 
 ## 1. Modern Syntax & Declarations
 
-| Concept | Modern Laravel / PHP (8.3/8.4) | Modern Rust (1.80+) | Modern Engineering Insight |
+| Concept | Laravel 13 / PHP 8.6 | Modern Rust (1.85+) | Architectural Insight |
 |---|---|---|---|
-| **Immutable variable** | ❌ (PHP variables are always mutable) | `let x = 5;` | Rust defaults to immutability for thread-safety. |
+| **Immutable variable** | ❌ (PHP variables are reassignable) | `let x = 5;` | Rust defaults to immutability for thread-safety. |
 | **Mutable variable** | `$x = 5; $x = 10;` | `let mut x = 5; x = 10;` | Explicit `mut` keyword required. |
 | **Constants** | `const TIMEOUT = 30;` | `const TIMEOUT: u32 = 30;` | Evaluated at compile time. |
 | **Type Casting** | `(int) $val` | `val as i32` or `val.parse::<i32>()?` | Primitive cast vs safe fallible string parsing. |
@@ -21,7 +21,7 @@ Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 
 
 ## 2. Nullability, Guard Clauses & Early Returns
 
-| Concept | Modern Laravel / PHP 8.3+ | Modern Rust (1.80+) |
+| Concept | Laravel 13 / PHP 8.6 | Modern Rust (1.85+) |
 |---|---|---|
 | **Nullable type** | `?string` | `Option<String>` |
 | **Null value** | `null` | `None` |
@@ -34,10 +34,11 @@ Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 
 
 ## 3. Data Structures & OOP
 
-| Modern Laravel (11/12) | Modern Rust (1.80+) | Architectural Insight |
+| Laravel 13 / PHP 8.6 | Modern Rust (1.85+) | Architectural Insight |
 |---|---|---|
 | `readonly class UserDTO { public function __construct(public string $name) {} }` | `struct UserDto { pub name: String }` | Rust structs hold only pure data. |
-| Property Hooks (PHP 8.4) / Getters | Methods on struct: `impl UserDto { pub fn full_name(&self) -> String { ... } }` | Behavior is implemented separately in `impl` blocks. |
+| **Asymmetric Visibility** (`public private(set) string $name;`) | `pub struct User { name: String }` + `pub fn name(&self) -> &str` | Public getter with private field mutation. |
+| **Property Hooks** (`public string $fullName { get => ... }`) | Methods on struct: `impl UserDto { pub fn full_name(&self) -> String { ... } }` | Behavior is implemented separately in `impl` blocks. |
 | `$this->name` | `self.name` | Methods explicitly declare `&self` (read) or `&mut self` (write). |
 | Static Constructor `User::create(...)` | `impl User { pub fn new(...) -> Self }` | Idiomatic constructor convention. |
 | `interface HasUuid` | `trait HasUuid { fn uuid(&self) -> String; }` | Defines behavioral contracts. |
@@ -46,9 +47,9 @@ Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 
 
 ---
 
-## 4. Modern Web Architecture: Laravel 11/12 vs Axum 0.7+
+## 4. Modern Web Architecture: Laravel 13 vs Axum 0.7+
 
-| Modern Laravel 11/12 Component | Modern Rust (Axum 0.7+ & Tokio) Equivalent |
+| Laravel 13 Component | Modern Rust (Axum 0.7+ & Tokio) Equivalent |
 |---|---|
 | **Entrypoint / App Setup** (`bootstrap/app.php`) | `src/main.rs` with `Router::new().with_state(...)` and `axum::serve(listener, app)` |
 | **Routing** (`routes/api.php`) | `Router::new().route("/users", get(get_users).post(create_user))` |
@@ -60,4 +61,4 @@ Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 
 | **Database Migrations** | `sqlx migrate run` (Embedded compile-time verified migrations) |
 | **Artisan Command** | `clap` CLI crate (`#[derive(Parser)]`) |
 | **Queues / Jobs** | Tokio MPSC channels (`tokio::sync::mpsc`) or Redis workers |
-| **Modern Test Suite** (Pest 3) | Built-in `cargo test` (`#[test]`) with `assert_eq!` |
+| **Modern Test Suite** (Pest) | Built-in `cargo test` (`#[test]`) with `assert_eq!` |

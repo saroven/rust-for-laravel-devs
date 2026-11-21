@@ -1,15 +1,15 @@
 # Rust for PHP & Laravel Developers: The Zero-to-Production Guide
 
-[![Rust](https://img.shields.io/badge/Rust-2021_Edition-orange?logo=rust)](https://www.rust-lang.org/)
-[![Laravel](https://img.shields.io/badge/Laravel-PHP_8+-red?logo=laravel)](https://laravel.com/)
+[![Rust](https://img.shields.io/badge/Rust-2024_Edition-orange?logo=rust)](https://www.rust-lang.org/)
+[![Laravel](https://img.shields.io/badge/Laravel-13_(PHP_8.6)-red?logo=laravel)](https://laravel.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/saroven/rust-for-laravel-devs/pulls)
 
-Welcome to the definitive Rust curriculum designed specifically for **PHP and Laravel developers**.
+Welcome to the definitive Rust curriculum designed specifically for **PHP 8.6 and Laravel 13 developers**.
 
 In PHP, the Zend Engine's garbage collector, dynamic typing, and PHP-FPM's shared-nothing process model abstract away hardware memory, pointers, and threads. In Rust, you write high-level, expressive code that compiles down to raw, zero-overhead machine instructions.
 
-This curriculum bridges the exact mental models you already know from modern PHP 8 and Laravel (Dependency Injection, Service Containers, Eloquent, Queues, FormRequests, Middleware, Pest/PHPUnit) directly to their idiomatic Rust equivalents.
+This curriculum bridges the exact mental models you already know from modern **Laravel 13** and **PHP 8.6** (Dependency Injection, Service Containers, Eloquent, Queues, FormRequests, Middleware, Pest, Asymmetric Visibility, and Property Hooks) directly to their idiomatic Rust equivalents.
 
 ---
 
@@ -31,12 +31,12 @@ flowchart TD
 
     subgraph Phase2["Phase 2: Mastering Memory & Concurrency (Intermediate)"]
         M7["07. Lifetimes Demystified<br/><i>Borrow scope, 'a, lifetime elision</i>"]
-        M8["08. Smart Pointers & Shared State<br/><i>Box, Rc, Arc, RefCell, Mutex, RwLock</i>"]
+        M8["08. Smart Pointers & Shared State<br/><i>Box, Rc, Arc, RefCell, Mutex, RwLock, LazyLock</i>"]
         M9["09. Async & Concurrency<br/><i>Tokio async vs PHP-FPM, green tasks, mpsc channels</i>"]
     end
 
     subgraph Phase3["Phase 3: Production Backend Engineering (Advanced)"]
-        M10["10. Web Backend: Laravel to Axum<br/><i>Routing, Extractors, State, SQLx vs Eloquent</i>"]
+        M10["10. Web Backend: Laravel 13 to Axum<br/><i>Routing, Extractors, State, SQLx vs Eloquent</i>"]
         M10DB["10-B. SQLx Database & Migrations<br/><i>Connection pools, migrations, transactions</i>"]
         M11["11. Clean Architecture & Production<br/><i>Hexagonal layers, tracing, 15MB Docker containers</i>"]
         M12["12. Testing & Quality<br/><i>Pest vs cargo test, integration tests, mocks</i>"]
@@ -73,7 +73,7 @@ flowchart TD
 | Module | Topic | Description | Link |
 |---|---|---|---|
 | **07** | **Lifetimes Demystified** | References scope, Preventing dangling pointers, Lifetime elision, Struct lifetimes | [07-lifetimes-and-references](07-lifetimes-and-references/README.md) |
-| **08** | **Smart Pointers & State** | `Box<T>`, `Rc<T>`, `Arc<T>`, `RefCell<T>`, `Mutex<T>`, `RwLock<T>` | [08-smart-pointers-and-memory](08-smart-pointers-and-memory/README.md) |
+| **08** | **Smart Pointers & State** | `Box<T>`, `Rc<T>`, `Arc<T>`, `RefCell<T>`, `Mutex<T>`, `RwLock<T>`, `LazyLock` | [08-smart-pointers-and-memory](08-smart-pointers-and-memory/README.md) |
 | **09** | **Async & Concurrency** | PHP-FPM vs Tokio async event loop, `tokio::spawn`, MPSC channels | [09-async-and-concurrency](09-async-and-concurrency/README.md) |
 
 ### 🟠 Phase 3: Production Backend Engineering (Advanced)
@@ -95,7 +95,7 @@ flowchart TD
 ---
 
 ## ⚡ Essential Companions
-- **The Rosetta Stone (PHP to Rust Dictionary)**: [cheat-sheets/php-to-rust-dictionary.md](cheat-sheets/php-to-rust-dictionary.md)
+- **The Modern Rosetta Stone (PHP 8.6 & Laravel 13 to Rust)**: [cheat-sheets/php-to-rust-dictionary.md](cheat-sheets/php-to-rust-dictionary.md)
 - **Comprehensive Exercise Solutions**: [exercises-solutions/README.md](exercises-solutions/README.md)
 
 ---

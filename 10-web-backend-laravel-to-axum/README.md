@@ -1,9 +1,9 @@
-# Module 10: Web Backend Architecture (Laravel 11/12 to Axum 0.7+)
+# Module 10: Web Backend Architecture (Laravel 13 to Axum 0.7+)
 
-In modern **Laravel 11 & 12**, the framework was radically streamlined:
-- `app/Http/Kernel.php` was **removed**.
-- Middleware and routing are now configured directly in **`bootstrap/app.php`**.
-- Native health routes (`/up`).
+In modern **Laravel 13**, the framework operates on a streamlined, minimal footprint:
+- Unified application orchestration inside **`bootstrap/app.php`**.
+- Automatic route discovery and health endpoints (`/up`).
+- Built-in asynchronous concurrency utilities.
 
 In Rust, the premier modern web framework is **Axum 0.7+** (built and maintained by the official Tokio team).
 
@@ -12,7 +12,7 @@ In Rust, the premier modern web framework is **Axum 0.7+** (built and maintained
 ## 1. Architectural Request Flow Comparison
 
 ```
-Modern Laravel 11/12:
+Modern Laravel 13:
 HTTP Request ──► public/index.php ──► bootstrap/app.php (withRouting, withMiddleware) ──► Controller (FormRequest) ──► Eloquent ──► Response
 
 Modern Axum 0.7+:
@@ -23,7 +23,7 @@ HTTP Request ──► Axum Binary (Hyper Engine) ──► Tower Middleware Pip
 
 ## 2. Application Setup & Middleware Registration
 
-### Modern Laravel 11/12 (`bootstrap/app.php`):
+### Modern Laravel 13 (`bootstrap/app.php`):
 ```php
 <?php
 
@@ -65,7 +65,7 @@ async fn main() {
 
     // 3. Build router with middleware pipeline and state
     let app = Router::new()
-        .route("/up", get(|| async { "OK" })) // Built-in health check like Laravel /up
+        .route("/up", get(|| async { "OK" })) // Built-in health check like Laravel 13 /up
         .route("/api/v1/clients", get(list_clients).post(create_client))
         .layer(TraceLayer::new_for_http())    // Middleware (like Laravel request logging)
         .with_state(state);
@@ -139,7 +139,7 @@ async fn create_client(
 
 ## 4. Centralized Error Handling: `IntoResponse`
 
-In Laravel 11/12, you configure exception rendering inside `withExceptions` in `bootstrap/app.php`.  
+In Laravel 13, you configure exception rendering inside `withExceptions` in `bootstrap/app.php`.  
 In Axum, you implement the `IntoResponse` trait for your custom error enum:
 
 ```rust

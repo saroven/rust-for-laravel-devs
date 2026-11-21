@@ -1,18 +1,18 @@
 # Module 03: Structs, Enums & Modern Pattern Matching
 
-In modern Laravel (PHP 8.2, 8.3, 8.4), data modeling has moved toward **readonly classes**, **DTOs (Data Transfer Objects)**, and **backed enums**.
+In modern **Laravel 13** and **PHP 8.6**, data modeling has embraced **readonly classes**, **DTOs**, **asymmetric visibility** (`public private(set)`), and **property hooks**.
 
-In Rust, data and behavior have always been cleanly separated:
-- **`struct`**: Pure data container (like a modern readonly DTO).
+In Rust, data and behavior are cleanly separated by design:
+- **`struct`**: Pure data container (like a modern readonly DTO with private fields and public getters).
 - **`impl`**: Methods and business logic.
 - **`enum`**: Tagged unions (each variant can carry distinct data).
 - **`let-else` (Modern Rust)**: The ultimate guard clause replacing nested statements.
 
 ---
 
-## 1. Structs as Modern DTOs
+## 1. Structs as Modern DTOs (PHP 8.6 vs Rust)
 
-### Modern PHP 8.2+ Readonly DTO:
+### Modern PHP 8.6 Readonly DTO with Asymmetric Visibility & Property Hooks:
 ```php
 <?php
 
@@ -22,6 +22,11 @@ readonly class CreateClientDTO {
         public string $boid,
         public float $initialDeposit = 0.0,
     ) {}
+
+    // PHP 8.4+ / 8.6 Property Hook
+    public string $displayLabel {
+        get => "Client: {$this->clientCode} (Deposit: ৳{$this->initialDeposit})";
+    }
 }
 ```
 
@@ -34,6 +39,13 @@ pub struct CreateClientDto {
     pub initial_deposit: f64,
 }
 
+impl CreateClientDto {
+    // Equivalent to a property hook getter
+    pub fn display_label(&self) -> String {
+        format!("Client: {} (Deposit: ৳{})", self.client_code, self.initial_deposit)
+    }
+}
+
 fn main() {
     let dto = CreateClientDto {
         client_code: String::from("CL-1002"),
@@ -41,7 +53,7 @@ fn main() {
         initial_deposit: 25_000.0,
     };
 
-    println!("Client: {} | Deposit: ৳{}", dto.client_code, dto.initial_deposit);
+    println!("{}", dto.display_label());
 }
 ```
 
@@ -84,7 +96,7 @@ impl ClientAccount {
 
 ## 3. Enums: Tagged Unions (Beyond PHP Enums)
 
-In PHP 8.1+, enums can only hold simple scalar values:
+In PHP, enums can only hold simple scalar values:
 ```php
 <?php
 enum OrderStatus: string {
@@ -126,9 +138,9 @@ fn send_notification(notif: Notification) {
 
 ## 4. Modern Guard Clauses: The `let-else` Statement
 
-In modern Laravel controllers, you frequently write guard clauses to return early if a record is not found or validation fails:
+In modern Laravel 13 controllers, you frequently write guard clauses to return early if a record is not found or validation fails:
 
-### Modern PHP Guard Clause:
+### Modern PHP 8.6 Guard Clause:
 ```php
 <?php
 $user = $this->userService->find($id);
