@@ -1,53 +1,89 @@
-# Module 10: Web Backend Architecture (Laravel to Axum)
+# Module 10: Web Backend Architecture (Laravel 11/12 to Axum 0.7+)
 
-In this module, we map the entire **Laravel web architecture** directly to **Axum** (Rust's premier web framework built by Tokio).
+In modern **Laravel 11 & 12**, the framework was radically streamlined:
+- `app/Http/Kernel.php` was **removed**.
+- Middleware and routing are now configured directly in **`bootstrap/app.php`**.
+- Native health routes (`/up`).
 
----
-
-## 1. Architectural Architecture Comparison
-
-```
-Laravel Web Request Flow:
-Client ──► public/index.php ──► Kernel ──► Middleware Pipeline ──► Route ──► Controller (FormRequest) ──► Eloquent ──► Response
-
-Axum Web Request Flow:
-Client ──► Axum Binary (Hyper Engine) ──► Tower Middleware ──► Router ──► Handler Function (Extractors) ──► SQLx ──► IntoResponse
-```
+In Rust, the premier modern web framework is **Axum 0.7+** (built and maintained by the official Tokio team).
 
 ---
 
-## 2. Request Routing & Handlers
+## 1. Architectural Request Flow Comparison
 
-### In Laravel (`routes/api.php`):
+```
+Modern Laravel 11/12:
+HTTP Request ──► public/index.php ──► bootstrap/app.php (withRouting, withMiddleware) ──► Controller (FormRequest) ──► Eloquent ──► Response
+
+Modern Axum 0.7+:
+HTTP Request ──► Axum Binary (Hyper Engine) ──► Tower Middleware Pipeline ──► Router ──► Handler (Extractors) ──► SQLx ──► IntoResponse
+```
+
+---
+
+## 2. Application Setup & Middleware Registration
+
+### Modern Laravel 11/12 (`bootstrap/app.php`):
 ```php
 <?php
-Route::prefix('v1/clients')->group(function () {
-    Route::get('/', [ClientController::class, 'index']);
-    Route::post('/', [ClientController::class, 'store']);
-    Route::get('/{id}', [ClientController::class, 'show']);
-});
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        api: __DIR__.'/../routes/api.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(CustomAuthMiddleware::class);
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        // Exception mapping...
+    })
+    ->create();
 ```
 
-### In Axum:
+### Modern Axum 0.7+ (`src/main.rs`):
 ```rust
 use axum::{
     routing::{get, post},
     Router,
 };
+use std::sync::Arc;
+use tower_http::trace::TraceLayer;
 
-pub fn client_routes() -> Router<Arc<AppState>> {
-    Router::new()
+#[tokio::main]
+async fn main() {
+    // 1. Initialize logging
+    tracing_subscriber::fmt::init();
+
+    // 2. Initialize shared state (like Laravel Service Container)
+    let state = Arc::new(AppState::new().await);
+
+    // 3. Build router with middleware pipeline and state
+    let app = Router::new()
+        .route("/up", get(|| async { "OK" })) // Built-in health check like Laravel /up
         .route("/api/v1/clients", get(list_clients).post(create_client))
-        .route("/api/v1/clients/:id", get(get_client))
+        .layer(TraceLayer::new_for_http())    // Middleware (like Laravel request logging)
+        .with_state(state);
+
+    // 4. Modern Axum 0.7+ listener binding (NOT legacy Server::bind)
+    let addr = "0.0.0.0:8000";
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    println!("🚀 Server running on http://{addr}");
+
+    axum::serve(listener, app).await.unwrap();
 }
 ```
 
 ---
 
-## 3. Extractors: The Superpower of Axum
+## 3. Extractors: Declarative Request Handling
 
-In Laravel, you inject `$request: Request` or a `FormRequest` class, then call `$request->validate()` or `$request->input('name')`.
-
+In Laravel, you inject `$request` or a `FormRequest` class, then call `$request->validate()`.  
 In Axum, handlers declare **typed extractors** in their arguments. Axum automatically deserializes, parses, and validates them before running your handler:
 
 ```rust
@@ -59,9 +95,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Deserialize)]
-pub struct FilterParams {
-    pub search: Option<String>,
+pub struct Pagination {
     pub page: Option<u32>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -79,16 +115,20 @@ pub struct ClientResponse {
 }
 
 // Axum Handler:
+// - Path: /api/v1/clients/:id
+// - Query: ?page=1&limit=20
+// - State: Shared AppState
+// - Json: Auto-validated JSON body
 async fn create_client(
-    State(state): State<Arc<AppState>>,             // Like Laravel Dependency Injection
-    Query(filters): Query<FilterParams>,            // Like $request->query('page')
-    Json(payload): Json<CreateClientDto>,           // Like FormRequest (auto-parsed JSON)
+    State(state): State<Arc<AppState>>,
+    Query(pagination): Query<Pagination>,
+    Json(payload): Json<CreateClientDto>,
 ) -> Result<Json<ClientResponse>, AppError> {
-    // If the client sent invalid JSON or missing fields,
-    // Axum automatically returns HTTP 400 or 422 before this function is ever called!
+    // If client sent malformed JSON or wrong data types,
+    // Axum automatically rejects with 400 Bad Request BEFORE this code runs!
 
     Ok(Json(ClientResponse {
-        id: 1,
+        id: 101,
         client_code: payload.client_code,
         balance: payload.initial_deposit,
     }))
@@ -97,104 +137,10 @@ async fn create_client(
 
 ---
 
-## 4. Custom Extractors: Replacing FormRequests & Auth Guards
+## 4. Centralized Error Handling: `IntoResponse`
 
-In Laravel, you use Middleware or `$request->user()` to access the authenticated user.  
-In Axum, you can create a custom `AuthUser` extractor:
-
-```rust
-use axum::{
-    async_trait,
-    extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
-};
-
-pub struct AuthUser {
-    pub user_id: u64,
-    pub role: String,
-}
-
-#[async_trait]
-impl<S> FromRequestParts<S> for AuthUser
-where
-    S: Send + Sync,
-{
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Extract Authorization header
-        let auth_header = parts
-            .headers
-            .get("Authorization")
-            .and_then(|h| h.to_str().ok());
-
-        match auth_header {
-            Some(token) if token == "Bearer secret-token-123" => Ok(AuthUser {
-                user_id: 42,
-                role: "client".to_string(),
-            }),
-            _ => Err((StatusCode::UNAUTHORIZED, "Invalid or missing Bearer token")),
-        }
-    }
-}
-
-// Now you can simply declare AuthUser in any handler!
-async fn get_my_portfolio(user: AuthUser) -> String {
-    format!("Hello User {}, loading your portfolio...", user.user_id)
-}
-```
-
----
-
-## 5. Database Access: SQLx vs Eloquent
-
-### Laravel Eloquent:
-```php
-<?php
-// Eloquent Active Record
-$clients = Client::where('balance', '>', 1000)
-    ->orderBy('created_at', 'desc')
-    ->get();
-```
-
-### Rust with SQLx:
-SQLx provides **compile-time checked SQL**. If you misspell a column name in your SQL query, `cargo build` will fail with a compilation error!
-
-```rust
-use sqlx::{FromRow, PgPool};
-
-#[derive(Debug, FromRow, serde::Serialize)]
-pub struct ClientRow {
-    pub id: i64,
-    pub client_code: String,
-    pub boid: String,
-    pub balance: f64,
-}
-
-pub async fn find_wealthy_clients(pool: &PgPool) -> Result<Vec<ClientRow>, sqlx::Error> {
-    let clients = sqlx::query_as!(
-        ClientRow,
-        r#"
-        SELECT id, client_code, boid, balance 
-        FROM clients 
-        WHERE balance > $1 
-        ORDER BY id DESC
-        "#,
-        1000.0
-    )
-    .fetch_all(pool)
-    .await?;
-
-    Ok(clients)
-}
-```
-
----
-
-## 6. Centralized HTTP Error Handling
-
-In Laravel, you configure `app/Exceptions/Handler.php`.  
-In Axum, you implement `IntoResponse` for your application error enum:
+In Laravel 11/12, you configure exception rendering inside `withExceptions` in `bootstrap/app.php`.  
+In Axum, you implement the `IntoResponse` trait for your custom error enum:
 
 ```rust
 use axum::{
@@ -209,7 +155,7 @@ pub enum AppError {
     NotFound(String),
     BadRequest(String),
     Unauthorized,
-    DatabaseError(sqlx::Error),
+    Internal(String),
 }
 
 impl IntoResponse for AppError {
@@ -218,8 +164,8 @@ impl IntoResponse for AppError {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
-            AppError::DatabaseError(err) => {
-                eprintln!("Database error: {:?}", err);
+            AppError::Internal(err) => {
+                eprintln!("[SERVER ERROR] {err}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }
         };
@@ -234,4 +180,11 @@ impl IntoResponse for AppError {
 }
 ```
 
-Now, any handler can simply return `Result<Json<T>, AppError>` and errors are automatically transformed into clean JSON HTTP responses!
+Any handler can now return `Result<Json<T>, AppError>` and errors are automatically transformed into clean JSON HTTP responses with proper status codes!
+
+---
+
+## 5. Next Step: Database & Migrations with SQLx
+
+Proceed to the companion guide:  
+👉 **[SQLx Database, Connection Pools & Migrations](database-and-migrations-sqlx.md)**

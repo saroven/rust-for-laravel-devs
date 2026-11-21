@@ -1,91 +1,63 @@
-# PHP to Rust: The Complete Developer Dictionary
+# PHP & Laravel to Rust: The Modern Rosetta Stone
 
-This reference bridges PHP 8+ and Laravel constructs to their modern Rust equivalents.
+Targeted for **Laravel 11+ / 12+ (PHP 8.3/8.4)** and **Modern Rust (Rust 1.80+, 2021/2024 Edition)**.
 
 ---
 
-## 1. Core Syntax & Variables
+## 1. Modern Syntax & Declarations
 
-| Concept | PHP 8+ | Rust 2021+ | Notes |
+| Concept | Modern Laravel / PHP (8.3/8.4) | Modern Rust (1.80+) | Modern Engineering Insight |
 |---|---|---|---|
-| **Immutable variable** | ❌ (PHP has no immutable variables) | `let x = 5;` | In Rust, variables are immutable by default. |
-| **Mutable variable** | `$x = 5; $x = 10;` | `let mut x = 5; x = 10;` | Must use `mut` keyword. |
-| **Constant** | `const TAX_RATE = 0.15;` | `const TAX_RATE: f64 = 0.15;` | Explicit type annotation required. |
-| **Type Casting** | `(int) $val` | `val as i32` or `val.parse::<i32>()` | `as` is primitive cast; `.parse()` handles string conversion safely. |
-| **Shadowing** | ❌ (Overwrites same variable) | `let val = "42"; let val: u32 = val.parse()?;` | Re-declaring `let` changes type without dummy variable names. |
-| **String Interpolation** | `"Hello, {$name}!"` | `format!("Hello, {name}!")` | `println!("Hello, {name}!");` for stdout. |
-| **Dump and Die** | `dd($user);` or `dump($user);` | `dbg!(&user);` or `println!("{:#?}", user);` | `dbg!` prints file and line number, and returns the expression! |
+| **Immutable variable** | ❌ (PHP variables are always mutable) | `let x = 5;` | Rust defaults to immutability for thread-safety. |
+| **Mutable variable** | `$x = 5; $x = 10;` | `let mut x = 5; x = 10;` | Explicit `mut` keyword required. |
+| **Constants** | `const TIMEOUT = 30;` | `const TIMEOUT: u32 = 30;` | Evaluated at compile time. |
+| **Type Casting** | `(int) $val` | `val as i32` or `val.parse::<i32>()?` | Primitive cast vs safe fallible string parsing. |
+| **Variable Shadowing** | ❌ (Overwrites same slot) | `let val = "42"; let val: u32 = val.parse()?;` | Transform value and type without dummy names. |
+| **String Interpolation** | `"Hello, {$name}!"` | `format!("Hello, {name}!")` | Inline variable capture in modern Rust. |
+| **Dump and Die** | `dd($user);` | `dbg!(&user);` or `println!("{user:#?}");` | Modern inline formatting. |
+| **Global Singletons** | Laravel Singleton in Service Provider | `static CONFIG: std::sync::LazyLock<Config> = std::sync::LazyLock::new(...);` | Built-in standard library in Rust 1.80+ (No third-party `lazy_static` needed!). |
 
 ---
 
-## 2. Nullability & Values
+## 2. Nullability, Guard Clauses & Early Returns
 
-| Concept | PHP | Rust |
+| Concept | Modern Laravel / PHP 8.3+ | Modern Rust (1.80+) |
 |---|---|---|
 | **Nullable type** | `?string` | `Option<String>` |
-| **Null literal** | `null` | `None` |
-| **Non-null value** | `'John'` | `Some(String::from("John"))` |
+| **Null value** | `null` | `None` |
+| **Has value** | `'John'` | `Some(String::from("John"))` |
 | **Null coalescing** | `$name ?? 'Default'` | `name.unwrap_or_else(\|\| "Default".to_string())` |
 | **Nullsafe operator** | `$user?->profile?->avatar` | `user.and_then(\|u\| u.profile).map(\|p\| p.avatar)` |
-| **Checking presence** | `is_null($x)` or `$x !== null` | `x.is_none()` or `x.is_some()` |
+| **Early Guard Clause** | `if (!$user) return response()->json([], 404);` | **Modern `let-else` (Rust 1.65+)**: `let Some(user) = find_user(id) else { return Err(AppError::NotFound); };` |
 
 ---
 
 ## 3. Data Structures & OOP
 
-| PHP / Laravel | Rust Equivalent | Architectural Insight |
+| Modern Laravel (11/12) | Modern Rust (1.80+) | Architectural Insight |
 |---|---|---|
-| `class User { public string $name; }` | `struct User { pub name: String }` | Rust structs hold only data, never method bodies. |
-| Class Methods | `impl User { pub fn new(...) -> Self { ... } }` | Behavior is implemented separately via `impl` blocks. |
-| `$this->name` | `self.name` | Methods explicitly take `&self` (read) or `&mut self` (write). |
-| Constructor `__construct` | Associated function convention: `User::new(...)` | Rust has no constructor syntax; `new` is an idiomatic function returning `Self`. |
-| `interface HasUuid` | `trait HasUuid { fn uuid(&self) -> String; }` | Traits define interface contracts. |
-| `trait Timestampable` | `trait Timestampable` (with default methods) | Rust traits can provide default method implementations. |
-| Class Inheritance (`extends`) | ❌ **Does not exist in Rust** | Use **Composition**: embed one struct inside another, or use Trait bounds. |
-| PHP 8.1 Enum | `enum Status: string { case Active; }` | `enum Status { Active, Suspended }` |
-| Enum with data (Algebraic Data Types)| ❌ Impossible without complex classes | `enum Event { Login(UserId), Error { code: u16, msg: String } }` |
+| `readonly class UserDTO { public function __construct(public string $name) {} }` | `struct UserDto { pub name: String }` | Rust structs hold only pure data. |
+| Property Hooks (PHP 8.4) / Getters | Methods on struct: `impl UserDto { pub fn full_name(&self) -> String { ... } }` | Behavior is implemented separately in `impl` blocks. |
+| `$this->name` | `self.name` | Methods explicitly declare `&self` (read) or `&mut self` (write). |
+| Static Constructor `User::create(...)` | `impl User { pub fn new(...) -> Self }` | Idiomatic constructor convention. |
+| `interface HasUuid` | `trait HasUuid { fn uuid(&self) -> String; }` | Defines behavioral contracts. |
+| PHP 8.1+ Enum | `enum Status: string { case Active; }` | `enum Status { Active, Suspended }` |
+| Enum with Data (Algebraic Types) | ❌ Impossible without complex classes | `enum Event { Login(UserId), Error { code: u16, msg: String } }` |
 
 ---
 
-## 4. Error Handling
+## 4. Modern Web Architecture: Laravel 11/12 vs Axum 0.7+
 
-| Concept | PHP | Rust |
-|---|---|---|
-| **Strategy** | Exceptions (`try / catch / throw`) | Explicit return values: `Result<T, E>` (`Ok(T)` or `Err(E)`) |
-| **Throw exception** | `throw new InvalidArgumentException("Bad");` | Return `Err(AppError::Invalid("Bad".into()))` |
-| **Try / Catch** | `try { ... } catch (Exception $e) { ... }` | `match result { Ok(val) => ..., Err(e) => ... }` |
-| **Propagate error up** | Automatic bubbling (can crash unhandled) | `let val = do_something()?;` (The `?` operator) |
-| **Fatal Crash / Abort**| `die("Fatal");` or `exit(1);` | `panic!("Fatal crash message");` |
-
----
-
-## 5. Arrays, Collections & Functional Pipelines
-
-| PHP / Laravel | Rust Equivalent | Architectural Insight |
-|---|---|---|
-| `[1, 2, 3]` (indexed) | `vec![1, 2, 3]` (`Vec<i32>`) | Dynamic array stored on heap. All elements must have the same type. |
-| `['a' => 1, 'b' => 2]` | `HashMap::from([("a", 1), ("b", 2)])` | Standard key-value hash map. |
-| `collect($arr)->map(...)` | `arr.iter().map(...).collect()` | Rust iterators are lazy: zero intermediate memory allocations. |
-| `collect($arr)->filter(...)` | `arr.into_iter().filter(...)` | Chains without evaluation until a consumer like `.collect()` is called. |
-| `in_array($val, $arr)` | `arr.contains(&val)` | Efficient binary or linear search. |
-| `count($arr)` | `arr.len()` | Returns `usize` (64-bit integer). |
-| `array_unique($arr)` | `let set: HashSet<_> = arr.into_iter().collect();` | Fast set deduplication. |
-
----
-
-## 6. Laravel Web Stack vs Rust Axum Stack
-
-| Laravel Layer | Rust (Axum + Tokio) Equivalent |
+| Modern Laravel 11/12 Component | Modern Rust (Axum 0.7+ & Tokio) Equivalent |
 |---|---|
+| **Entrypoint / App Setup** (`bootstrap/app.php`) | `src/main.rs` with `Router::new().with_state(...)` and `axum::serve(listener, app)` |
 | **Routing** (`routes/api.php`) | `Router::new().route("/users", get(get_users).post(create_user))` |
-| **Controller** | Async handler: `async fn get_users(State(db): State<Pool>) -> Json<Vec<User>>` |
-| **FormRequest / Validation** | `Json(payload): Json<CreateUserDto>` using `validator` crate |
-| **Middleware** | Tower layers / Axum middleware (`axum::middleware::from_fn(auth_guard)`) |
-| **Service Container / DI** | `State(state): State<Arc<AppState>>` |
-| **Eloquent Model** | `sqlx::FromRow` struct or `sea-orm` ActiveModel |
-| **Database Migrations** | `sqlx migrate run` or `sea-orm-cli migrate up` |
+| **Middleware Registration** (`withMiddleware` in `bootstrap/app.php`) | Tower Layers: `.layer(axum::middleware::from_fn(auth_guard))` |
+| **Exception Handling** (`withExceptions` in `bootstrap/app.php`) | `IntoResponse` implementation on central `AppError` enum |
+| **FormRequest / Validation** | `Json(payload): Json<CreateUserDto>` with `validator` crate |
+| **Dependency Injection** | `State(state): State<Arc<AppState>>` |
+| **Eloquent Model** (`casts(): array`) | Strongly typed struct with `sqlx::FromRow` and Serde |
+| **Database Migrations** | `sqlx migrate run` (Embedded compile-time verified migrations) |
 | **Artisan Command** | `clap` CLI crate (`#[derive(Parser)]`) |
-| **Queue Worker / Jobs** | Tokio asynchronous channels (`tokio::sync::mpsc`) or Redis workers |
-| **Log Facade (`Log::info`)** | `tracing` crate: `tracing::info!("User created: {id}");` |
-| **Environment (`.env`)** | `dotenvy` crate + strongly typed Config struct with `envy` |
-| **PHPUnit / Pest** | Built-in test runner: `cargo test` (`#[test]`) |
+| **Queues / Jobs** | Tokio MPSC channels (`tokio::sync::mpsc`) or Redis workers |
+| **Modern Test Suite** (Pest 3) | Built-in `cargo test` (`#[test]`) with `assert_eq!` |

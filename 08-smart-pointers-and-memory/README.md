@@ -1,8 +1,8 @@
-# Module 08: Smart Pointers & Shared State
+# Module 08: Smart Pointers, Shared State & Modern Singletons
 
-In PHP, all objects are implicitly reference-counted pointers. When you pass an object around (`$order->setCustomer($customer)`), PHP passes an internal pointer handle. If multiple objects reference `$customer`, PHP's garbage collector tracks the reference count.
+In PHP, all objects are implicitly reference-counted pointers. When you pass an object around (`$order->setCustomer($customer)`), PHP passes an internal pointer handle.
 
-In Rust, variables have single ownership by default. When you need **shared ownership** or **mutation across multiple owners**, you use **Smart Pointers**.
+In Rust, variables have single ownership by default. When you need **shared ownership**, **interior mutability**, or **global singletons**, you use **Smart Pointers**.
 
 ---
 
@@ -16,142 +16,115 @@ In Rust, variables have single ownership by default. When you need **shared owne
 | `RefCell<T>` | Reference Cell | No | **Interior Mutability**: mutate data behind immutable ref | Mutating object properties in PHP |
 | `Mutex<T>` | Mutual Exclusion Lock | **Yes** | Thread-safe mutable access (one writer at a time) | Mutex / Semaphore |
 | `RwLock<T>` | Read-Write Lock | **Yes** | Many readers OR one writer across threads | Read/Write DB lock |
+| **`std::sync::LazyLock<T>`** | Lazy Lock (Modern Rust 1.80+) | **Yes** | **Global thread-safe singletons** | **Laravel App Singleton** |
 
 ---
 
-## 2. `Box<T>`: Simple Heap Allocation
+## 2. Modern Global Singletons: `std::sync::LazyLock` (Rust 1.80+)
 
-In Rust, local variables live on the Stack by default. If you have a very large struct or a recursive data structure, you store it on the Heap using `Box::new()`:
+In older Rust tutorials, you will see third-party crates like `lazy_static` or `once_cell` used to create global singletons.
 
+**In modern Rust (1.80+), this is built directly into the standard library with `std::sync::LazyLock`!**
+
+### In Laravel:
+```php
+<?php
+// Registered once in AppServiceProvider:
+$this->app->singleton('system_config', fn() => new SystemConfig());
+```
+
+### In Modern Rust:
 ```rust
-// Recursive type: A binary tree node
-enum BinaryTree {
-    Leaf(i32),
-    Node {
-        value: i32,
-        left: Box<BinaryTree>,  // Must be Boxed because size is recursive!
-        right: Box<BinaryTree>,
-    },
-}
+use std::sync::LazyLock;
+use std::collections::HashMap;
+
+// Initialized exactly once on first access, thread-safe, and zero runtime cost after init!
+static SUPPORTED_CURRENCIES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert("BDT", "Bangladeshi Taka");
+    m.insert("USD", "US Dollar");
+    m.insert("EUR", "Euro");
+    m
+});
 
 fn main() {
-    let large_number = Box::new(100_000); // Stored on heap
-    println!("Value: {}", *large_number); // Dereference with *
-} // Deallocated automatically here!
+    // Access directly anywhere in your application across any thread:
+    if let Some(name) = SUPPORTED_CURRENCIES.get("BDT") {
+        println!("Currency: {name}");
+    }
+}
 ```
 
 ---
 
-## 3. `Rc<T>`: Shared Ownership in a Single Thread
+## 3. `Arc<T>`: Shared Ownership Across Threads
 
-What if you need two different structs to reference the same `User`?
-
-```
-    Struct A ──┐
-               ├──► Rc<User> (Ref Count = 2)
-    Struct B ──┘
-```
-
-```rust
-use std::rc::Rc;
-
-struct Client {
-    name: String,
-}
-
-struct Trade {
-    id: u64,
-    client: Rc<Client>, // Shared ownership!
-}
-
-fn main() {
-    let client = Rc::new(Client { name: String::from("Alice") });
-    println!("Ref count: {}", Rc::clone(&client)); // Count = 1
-
-    let trade1 = Trade { id: 1, client: Rc::clone(&client) };
-    println!("Ref count: {}", Rc::clone(&client)); // Count = 2
-
-    let trade2 = Trade { id: 2, client: Rc::clone(&client) };
-    println!("Ref count: {}", Rc::clone(&client)); // Count = 3
-} // When trade1, trade2, and client go out of scope, ref count drops to 0 and memory is freed!
-```
-*Note: `Rc::clone(&client)` does NOT deep-copy the data; it only increments the integer reference counter (instant O(1) operation).*
-
----
-
-## 4. `Arc<T>`: The Multithreaded Version of `Rc<T>`
-
-In modern web backends (like Axum), your application runs on multiple threads across CPU cores.  
-`Rc<T>` is NOT thread-safe (incrementing its counter across threads could cause race conditions).
-
-**`Arc<T>` (Atomic Reference Counting)** uses atomic CPU instructions to safely increment and decrement the counter across threads:
+In modern async web backends (like Axum), tasks run across multiple CPU cores.  
+`Arc<T>` (Atomic Reference Counting) allows multiple tasks to safely share read access to data without cloning the underlying memory:
 
 ```rust
 use std::sync::Arc;
-use std::thread;
+use tokio::task;
 
-fn main() {
-    let shared_data = Arc::new(String::from("System Config"));
+#[tokio::main]
+async fn main() {
+    let shared_config = Arc::new(String::from("Production Config v2.4"));
 
-    let data_clone = Arc::clone(&shared_data);
-    let handle = thread::spawn(move || {
-        println!("Background thread reading: {data_clone}");
+    let config_clone = Arc::clone(&shared_config);
+    let handle = tokio::spawn(async move {
+        println!("Background task reading: {config_clone}");
     });
 
-    println!("Main thread reading: {shared_data}");
-    handle.join().unwrap();
+    println!("Main task reading: {shared_config}");
+    handle.await.unwrap();
 }
 ```
 
 ---
 
-## 5. Interior Mutability: `Arc<RwLock<T>>` (The Web Backend Pattern)
+## 4. Interior Mutability: `Arc<RwLock<T>>` (In-Memory Caches)
 
-What if multiple threads need to **read AND write** shared data (e.g. an in-memory cache, active sessions, or a database connection pool)?
+What if multiple async requests need to **read AND write** shared memory (e.g. an in-memory session store or stock price cache)?
 
-In Rust, you combine:
-- `Arc<T>` (Provides shared ownership across threads)
-- `RwLock<T>` (Provides thread-safe read/write locking)
+Combine `Arc<T>` (shared ownership) with `RwLock<T>` (thread-safe locking):
 
 ```rust
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 struct AppState {
-    // Shared, thread-safe hash map
-    active_users: Arc<RwLock<HashMap<u64, String>>>,
+    // Many threads can read concurrently; writers get exclusive access
+    live_tickers: Arc<RwLock<HashMap<String, f64>>>,
 }
 
 fn main() {
     let state = AppState {
-        active_users: Arc::new(RwLock::new(HashMap::new())),
+        live_tickers: Arc::new(RwLock::new(HashMap::new())),
     };
 
-    // 1. Write lock (Exclusive access to mutate)
+    // 1. Write Lock (Exclusive mutation)
     {
-        let mut map = state.active_users.write().unwrap();
-        map.insert(101, String::from("Alice"));
-    } // Write lock automatically releases here when `map` drops!
+        let mut tickers = state.live_tickers.write().unwrap();
+        tickers.insert("GP".to_string(), 285.50);
+        tickers.insert("BATBC".to_string(), 518.20);
+    } // Write lock automatically drops and unlocks here!
 
-    // 2. Read lock (Multiple threads can read concurrently)
+    // 2. Read Lock (Concurrent reads)
     {
-        let map = state.active_users.read().unwrap();
-        if let Some(user) = map.get(&101) {
-            println!("Active user found: {user}");
+        let tickers = state.live_tickers.read().unwrap();
+        if let Some(price) = tickers.get("GP") {
+            println!("GP Current Price: ৳{price:.2}");
         }
-    } // Read lock automatically releases here!
+    } // Read lock automatically drops and unlocks here!
 }
 ```
-
-> **Why this matters for Laravel devs:**  
-> In Laravel, shared state across requests requires external services like Redis or Memcached because PHP-FPM processes don't share memory.  
-> In Rust, you can safely store high-speed shared state **in application RAM** with `Arc<RwLock<T>>` with sub-microsecond access!
 
 ---
 
 ## 🛠️ Exercises: Module 08
 
-1. **Shared Config**:
-   Create a struct `Config` with `app_name: String` and `port: u16`. Wrap it in an `Arc<Config>`, spawn two threads with `thread::spawn`, and print the configuration from both threads.
-2. **Thread-Safe Counter**:
-   Create a counter using `Arc<std::sync::Mutex<u32>>`. Spawn 5 threads where each thread increments the counter by 1. Join all threads and assert that the final value is 5.
+1. **Global App Metadata**:
+   Use `std::sync::LazyLock` to define a global `APP_METADATA` struct containing `version: &'static str` and `environment: &'static str`. Read it from `main()`.
+2. **Thread-Safe Cache**:
+   Create an `Arc<RwLock<Vec<String>>>`. Spawn 3 Tokio tasks that read the list, and 1 task that appends a new item. Observe that the borrow checker and `RwLock` guarantee thread safety.
+3. Check your work in [Comprehensive Exercise Solutions](../exercises-solutions/README.md).
